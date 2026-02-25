@@ -6,9 +6,14 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import config as cfg
 import cache as _cache
+from auth import auth_bp, require_auth
 
 app = Flask(__name__)
+app.secret_key = cfg.FLASK_SECRET_KEY
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 CORS(app)
+app.register_blueprint(auth_bp)
 
 
 def _get_client():
@@ -26,6 +31,7 @@ def _err(msg, status=400):
 # ─── Core tree / detail endpoints (1-hour cache) ──────────────────────────────
 
 @app.route('/api/tree')
+@require_auth
 def tree():
     try:
         return jsonify(_cache.get_or_set('tree', lambda: _get_client().get_tree()))
@@ -34,6 +40,7 @@ def tree():
 
 
 @app.route('/api/ou')
+@require_auth
 def ou():
     dn = request.args.get('dn', '').strip()
     if not dn:
@@ -48,6 +55,7 @@ def ou():
 
 
 @app.route('/api/group')
+@require_auth
 def group():
     dn = request.args.get('dn', '').strip()
     if not dn:
@@ -62,6 +70,7 @@ def group():
 
 
 @app.route('/api/user')
+@require_auth
 def user():
     dn = request.args.get('dn', '').strip()
     if not dn:
@@ -76,6 +85,7 @@ def user():
 
 
 @app.route('/api/alerts')
+@require_auth
 def alerts():
     try:
         return jsonify(_cache.get_or_set('alerts', lambda: _get_client().get_alerts()))
@@ -84,6 +94,7 @@ def alerts():
 
 
 @app.route('/api/stats')
+@require_auth
 def stats():
     try:
         return jsonify(_cache.get_or_set('stats', lambda: _get_client().get_stats()))
@@ -94,6 +105,7 @@ def stats():
 # ─── New-today onboarding endpoint (15-min cache) ────────────────────────────
 
 @app.route('/api/new-today')
+@require_auth
 def new_today():
     """
     Return all user accounts whose whenCreated falls within the current
@@ -112,6 +124,7 @@ def new_today():
 # ─── GPO endpoints (1-hour cache) ────────────────────────────────────────────
 
 @app.route('/api/gpos')
+@require_auth
 def gpos():
     try:
         return jsonify(_cache.get_or_set('gpos', lambda: _get_client().get_all_gpos()))
@@ -120,6 +133,7 @@ def gpos():
 
 
 @app.route('/api/gpo')
+@require_auth
 def gpo():
     guid = request.args.get('guid', '').strip()
     if not guid:
@@ -134,6 +148,7 @@ def gpo():
 
 
 @app.route('/api/ou-gpos')
+@require_auth
 def ou_gpos():
     dn = request.args.get('dn', '').strip()
     if not dn:
@@ -148,6 +163,7 @@ def ou_gpos():
 # ─── Search (never cached — always live) ─────────────────────────────────────
 
 @app.route('/api/search')
+@require_auth
 def search():
     q = request.args.get('q', '').strip()
     if len(q) < 2:
@@ -161,6 +177,7 @@ def search():
 # ─── Cache management ─────────────────────────────────────────────────────────
 
 @app.route('/api/last-updated')
+@require_auth
 def last_updated():
     """Return ISO timestamp of the most recent cache population."""
     ts = _cache.last_updated()
@@ -171,19 +188,21 @@ def last_updated():
 
 
 @app.route('/api/refresh', methods=['POST'])
+@require_auth
 def refresh():
     """Invalidate all cached entries — next request re-queries AD."""
     _cache.invalidate_all()
     return jsonify({'status': 'ok', 'message': 'Cache cleared'})
 
 
-# ─── Health ───────────────────────────────────────────────────────────────────
+# ─── Health (unauthenticated — needed to confirm app is running) ───────────────
 
 @app.route('/api/health')
 def health():
     return jsonify({
         'status': 'ok',
         'mock_mode': cfg.USE_MOCK_DATA,
+        'auth_enabled': cfg.AUTH_ENABLED,
         'stale_threshold_days': cfg.STALE_ACCOUNT_DAYS,
     })
 

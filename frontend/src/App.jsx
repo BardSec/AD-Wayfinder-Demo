@@ -5,6 +5,7 @@ import DetailPanel from './components/DetailPanel'
 import AlertsPanel from './components/AlertsPanel'
 import NewTodayPanel from './components/NewTodayPanel'
 import GPOPanel from './components/GPOPanel'
+import LoginPage from './components/LoginPage'
 import { api } from './api/adApi'
 
 const AUTO_REFRESH_MS = 60 * 60 * 1000  // 1 hour
@@ -21,8 +22,23 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)   // increment → remounts TopologyMap
   const [newTodayCount, setNewTodayCount] = useState(0)
 
+  // ── Auth state ───────────────────────────────────────────────────────────────
+  const [authChecked, setAuthChecked] = useState(false)
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    fetch('/auth/me')
+      .then((res) => (res.ok ? res.json() : { authenticated: false }))
+      .then((data) => {
+        setUser(data.authenticated ? data.user : null)
+        setAuthChecked(true)
+      })
+      .catch(() => { setUser(null); setAuthChecked(true) })
+  }, [])
+
   // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!authChecked || !user) return
     Promise.all([api.getStats(), api.getNewToday()])
       .then(([s, nt]) => {
         setStats(s)
@@ -30,7 +46,7 @@ export default function App() {
         setLastUpdated(new Date())
       })
       .catch(console.error)
-  }, [])
+  }, [authChecked, user])
 
   // ── Hourly auto-refresh ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -94,6 +110,16 @@ export default function App() {
 
   const alertCount = stats?.stale_accounts ?? 0
 
+  // ── Auth gate ────────────────────────────────────────────────────────────────
+  if (!authChecked) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-slate-400 text-sm">Loading…</div>
+      </div>
+    )
+  }
+  if (!user) return <LoginPage />
+
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
       <Header
@@ -108,6 +134,7 @@ export default function App() {
         lastUpdated={lastUpdated}
         isRefreshing={isRefreshing}
         onRefresh={doRefresh}
+        user={user}
       />
 
       <main className="flex-1 flex overflow-hidden">
