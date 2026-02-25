@@ -2,6 +2,7 @@
 Real Active Directory client using ldap3.
 Used when USE_MOCK_DATA=false and a live DC is reachable.
 """
+import re
 from datetime import datetime, timedelta
 from ldap3 import Server, Connection, ALL, NTLM, SUBTREE, BASE, LEVEL
 import config as cfg
@@ -50,6 +51,29 @@ def _parse_group_type(raw):
     else:
         parts.append('Distribution')
     return ' '.join(parts) if parts else 'Unknown'
+
+
+def _parse_gplink(gplink_str):
+    """Parse AD gPLink attribute into link descriptors.
+
+    Format: [LDAP://cn={GUID},cn=policies,cn=system,DC=...;flags][...]
+    flags: bit 0 = link disabled, bit 1 = enforced
+    """
+    if not gplink_str:
+        return []
+    links = []
+    for i, m in enumerate(re.finditer(
+            r'\[LDAP://[^/]*/\{([^}]+)\}[^;]*;(\d+)\]',
+            str(gplink_str), re.IGNORECASE)):
+        guid = '{' + m.group(1).upper() + '}'
+        flags = int(m.group(2))
+        links.append({
+            'guid': guid,
+            'order': i + 1,
+            'link_enabled': not bool(flags & 1),
+            'enforced': bool(flags & 2),
+        })
+    return links
 
 
 def _get_connection():
@@ -304,7 +328,127 @@ class ADClient:
             })
         return sorted(results, key=lambda x: x.get('when_created', ''), reverse=True)
 
+    def get_all_gpos(self):
+        """Return all GPOs in the domain."""
+        self._conn.search(
+            f'CN=Policies,CN=System,{self._base}',
+            '(objectClass=groupPolicyContainer)',
+            search_scope=SUBTREE,
+            attributes=['cn', 'displayName', 'flags', 'whenCreated',
+                        'whenChanged', 'description'],
+        )
+        results = []
+        for e in self._conn.entries:
+            guid = str(e.cn)
+            flags = int(str(e.flags)) if e.flags else 0
+            status = {0: 'enabled', 1: 'user_settings_disabled',
+                      2: 'computer_settings_disabled', 3: 'disabled'}.get(flags, 'enabled')
+            results.append({
+                'guid': guid,
+                'name': self._str(e.displayName) or guid,
+                'status': status,
+                'when_created': self._str(e.whenCreated),
+                'when_changed': self._str(e.whenChanged),
+                'description': self._str(e.description),
+                'link_count': 0,
+                'security_filters': [],
+            })
+        return sorted(results, key=lambda x: x['name'])
+
+    def get_gpo_details(self, guid):
+        """Return details for a single GPO including all OU links."""
+        gpo_dn = f'CN={guid},CN=Policies,CN=System,{self._base}'
+        self._conn.search(gpo_dn, '(objectClass=groupPolicyContainer)',
+                          search_scope=BASE,
+                          attributes=['cn', 'displayName', 'flags',
+                                      'whenCreated', 'whenChanged', 'description'])
+        if not self._conn.entries:
+            return None
+        e = self._conn.entries[0]
+        flags = int(str(e.flags)) if e.flags else 0
+        status = {0: 'enabled', 1: 'user_settings_disabled',
+                  2: 'computer_settings_disabled', 3: 'disabled'}.get(flags, 'enabled')
+        return {
+            'guid': guid,
+            'name': self._str(e.displayName) or guid,
+            'status': status,
+            'when_created': self._str(e.whenCreated),
+            'when_changed': self._str(e.whenChanged),
+            'description': self._str(e.description),
+            'security_filters': [],
+            'linked_ous': self._find_gpo_links(guid),
+        }
+
+    def get_ou_gpos(self, dn):
+        """Return GPOs applied to an OU including inherited links from ancestors."""
+        self._conn.search(dn, '(objectClass=*)', search_scope=BASE,
+                          attributes=['gPLink', 'gPOptions'])
+        blocks = False
+        direct_links = []
+        if self._conn.entries:
+            e = self._conn.entries[0]
+            gp_options = int(str(e.gPOptions)) if e.gPOptions else 0
+            blocks = bool(gp_options & 1)
+            for link in _parse_gplink(self._str(e.gPLink)):
+                link['name'] = self._gpo_name(link['guid'])
+                link['source'] = 'direct'
+                direct_links.append(link)
+
+        inherited_links = []
+        parent = dn.split(',', 1)[1] if ',' in dn else None
+        while parent:
+            self._conn.search(parent, '(objectClass=*)', search_scope=BASE,
+                              attributes=['gPLink'])
+            if self._conn.entries:
+                pe = self._conn.entries[0]
+                parent_label = parent.split(',')[0].lstrip('OUDCou= ')
+                for link in _parse_gplink(self._str(pe.gPLink)):
+                    if not link['link_enabled']:
+                        continue
+                    if blocks and not link['enforced']:
+                        continue
+                    link['name'] = self._gpo_name(link['guid'])
+                    link['source'] = 'inherited'
+                    link['inherited_from'] = parent_label
+                    link['inherited_from_dn'] = parent
+                    inherited_links.append(link)
+            parent = parent.split(',', 1)[1] if ',' in parent else None
+
+        return {
+            'dn': dn,
+            'blocks_inheritance': blocks,
+            'direct': direct_links,
+            'inherited': inherited_links,
+        }
+
     # ── Private helpers ───────────────────────────────────────────────────────
+
+    def _gpo_name(self, guid):
+        gpo_dn = f'CN={guid},CN=Policies,CN=System,{self._base}'
+        self._conn.search(gpo_dn, '(objectClass=groupPolicyContainer)',
+                          search_scope=BASE, attributes=['displayName'])
+        if self._conn.entries:
+            return self._str(self._conn.entries[0].displayName) or guid
+        return guid
+
+    def _find_gpo_links(self, guid):
+        self._conn.search(self._base, '(gPLink=*)', search_scope=SUBTREE,
+                          attributes=['distinguishedName', 'gPLink', 'name', 'ou', 'dc'])
+        linked_ous = []
+        for e in self._conn.entries:
+            for link in _parse_gplink(self._str(e.gPLink)):
+                if link['guid'].upper() == guid.upper():
+                    ou_dn = str(e.distinguishedName)
+                    name = (self._str(e.ou) or self._str(e.name) or
+                            self._str(e.dc) or ou_dn.split(',')[0])
+                    linked_ous.append({
+                        'ou_dn': ou_dn,
+                        'ou_name': name,
+                        'order': link['order'],
+                        'enforced': link['enforced'],
+                        'link_enabled': link['link_enabled'],
+                    })
+        return sorted(linked_ous, key=lambda x: x['ou_name'])
 
     def _domain_info(self):
         self._conn.search(self._base, '(objectClass=domain)',

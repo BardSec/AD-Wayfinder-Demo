@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Search, AlertTriangle, Network, X, User, Users, Folder,
-         RefreshCw, UserPlus, Clock } from 'lucide-react'
+         RefreshCw, UserPlus, Clock, ShieldCheck } from 'lucide-react'
 
 const TYPE_ICON = {
   user: <User size={14} className="text-slate-500" />,
@@ -82,6 +82,10 @@ export default function Header({
               {newTodayCount}
             </span>
           )}
+        </TabBtn>
+        <TabBtn active={view === 'gpo'} onClick={() => onViewChange('gpo')}>
+          <ShieldCheck size={13} className="mr-0.5" />
+          GPO Map
         </TabBtn>
       </nav>
 

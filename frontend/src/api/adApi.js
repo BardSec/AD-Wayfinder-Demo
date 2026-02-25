@@ -21,4 +21,7 @@ export const api = {
   getLastUpdated: () => _get('/last-updated'),
   triggerRefresh: () =>
     fetch(`${BASE}/refresh`, { method: 'POST' }).then((r) => r.json()),
+  getGPOs: () => _get('/gpos'),
+  getGPO: (guid) => _get(`/gpo?guid=${encodeURIComponent(guid)}`),
+  getOUGPOs: (dn) => _get(`/ou-gpos?dn=${encodeURIComponent(dn)}`),
 }

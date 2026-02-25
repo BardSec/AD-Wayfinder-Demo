@@ -1,6 +1,9 @@
+import { useState, useEffect } from 'react'
 import { AlertTriangle, User, Users, Folder, Globe, Clock, Shield,
          Mail, Phone, Building2, Calendar, Key, Hash, Loader2,
-         ChevronRight, CheckCircle2, XCircle } from 'lucide-react'
+         ChevronRight, CheckCircle2, XCircle, ShieldCheck,
+         ShieldAlert, ShieldOff, Lock } from 'lucide-react'
+import { api } from '../api/adApi'
 
 export default function DetailPanel({ node, data, loading, onNavigate }) {
   if (!node) {
@@ -77,6 +80,22 @@ function DomainStats({ data }) {
 
 // ── OU contents ───────────────────────────────────────────────────────────────
 function OUContents({ data, onNavigate }) {
+  const [gpoData, setGpoData] = useState(null)
+  const [gpoLoading, setGpoLoading] = useState(true)
+
+  useEffect(() => {
+    setGpoData(null)
+    setGpoLoading(true)
+    api.getOUGPOs(data.dn)
+      .then(setGpoData)
+      .catch(() => setGpoData({ direct: [], inherited: [], blocks_inheritance: false }))
+      .finally(() => setGpoLoading(false))
+  }, [data.dn])
+
+  const allGpos = gpoData
+    ? [...(gpoData.direct || []), ...(gpoData.inherited || [])]
+    : []
+
   return (
     <div className="divide-y divide-slate-100">
       {/* Counts */}
@@ -133,6 +152,73 @@ function OUContents({ data, onNavigate }) {
       {data.child_ous?.length === 0 && data.groups?.length === 0 && data.users?.length === 0 && (
         <div className="px-4 py-6 text-slate-400 text-sm text-center">This OU is empty</div>
       )}
+
+      {/* Group Policy */}
+      <Section
+        title="Group Policy"
+        icon={<ShieldCheck size={13} className="text-indigo-500" />}
+      >
+        {gpoLoading ? (
+          <div className="px-4 py-3 flex items-center gap-2 text-slate-400 text-sm">
+            <Loader2 size={13} className="animate-spin" /> Loading policies…
+          </div>
+        ) : (
+          <>
+            {gpoData?.blocks_inheritance && (
+              <div className="mx-4 my-2 flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 text-xs text-amber-700">
+                <Lock size={11} className="flex-shrink-0" />
+                Block Inheritance enabled — parent GPOs blocked (except enforced)
+              </div>
+            )}
+            {allGpos.length === 0 && (
+              <p className="px-4 py-2 text-slate-400 text-sm">No policies applied</p>
+            )}
+            {gpoData?.direct?.map((g) => (
+              <GPOLinkRow key={g.guid} link={g} />
+            ))}
+            {gpoData?.inherited?.map((g) => (
+              <GPOLinkRow key={`${g.guid}:${g.inherited_from_dn}`} link={g} />
+            ))}
+          </>
+        )}
+      </Section>
+    </div>
+  )
+}
+
+function GPOLinkRow({ link }) {
+  const isInherited = link.source === 'inherited'
+  const isDisabled = !link.link_enabled
+
+  return (
+    <div className="flex items-start gap-2.5 px-4 py-2.5 border-b border-slate-50 last:border-0">
+      <span className="flex-shrink-0 mt-0.5">
+        {isDisabled
+          ? <ShieldOff size={13} className="text-slate-300" />
+          : link.enforced
+            ? <ShieldAlert size={13} className="text-orange-500" />
+            : <ShieldCheck size={13} className="text-indigo-400" />
+        }
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className={`text-sm truncate block ${isDisabled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+          {link.name}
+        </span>
+        <span className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
+          {isInherited && (
+            <span>from {link.inherited_from}</span>
+          )}
+          {link.enforced && (
+            <span className="bg-orange-100 text-orange-600 px-1 rounded font-medium">Enforced</span>
+          )}
+          {isDisabled && (
+            <span className="bg-slate-100 text-slate-500 px-1 rounded">Link disabled</span>
+          )}
+          {!isInherited && !link.enforced && !isDisabled && (
+            <span className="text-slate-300">Order {link.order}</span>
+          )}
+        </span>
+      </span>
     </div>
   )
 }

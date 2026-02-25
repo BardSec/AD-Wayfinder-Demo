@@ -452,6 +452,134 @@ _GROUPS = {
     },
 }
 
+# ─── Group Policy Objects ─────────────────────────────────────────────────────
+
+_GPOS = {
+    '{31B2F340-016D-11D2-945F-00C04FB984F9}': {
+        'guid': '{31B2F340-016D-11D2-945F-00C04FB984F9}',
+        'name': 'Default Domain Policy',
+        'status': 'enabled',
+        'when_created': '2017-01-01',
+        'when_changed': '2023-06-15',
+        'description': 'Default domain-wide policy — password, lockout, and Kerberos settings',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{6AC1786C-016F-11D2-945F-00C04FB984F9}': {
+        'guid': '{6AC1786C-016F-11D2-945F-00C04FB984F9}',
+        'name': 'Default Domain Controllers Policy',
+        'status': 'enabled',
+        'when_created': '2017-01-01',
+        'when_changed': '2022-11-20',
+        'description': 'Audit and user-rights assignment policy for domain controllers',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{A1B2C3D4-0000-0000-0000-000000000001}': {
+        'guid': '{A1B2C3D4-0000-0000-0000-000000000001}',
+        'name': 'Acme Baseline Security',
+        'status': 'enabled',
+        'when_created': '2019-03-10',
+        'when_changed': '2024-09-01',
+        'description': 'Corporate security baseline: BitLocker, Windows Firewall, SMB signing',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{B2C3D4E5-0000-0000-0000-000000000002}': {
+        'guid': '{B2C3D4E5-0000-0000-0000-000000000002}',
+        'name': 'IT Workstation Policy',
+        'status': 'enabled',
+        'when_created': '2020-01-15',
+        'when_changed': '2024-07-22',
+        'description': 'IT-specific config: local admin rights, remote management, dev tools',
+        'security_filters': ['GG_IT_All'],
+    },
+    '{C3D4E5F6-0000-0000-0000-000000000003}': {
+        'guid': '{C3D4E5F6-0000-0000-0000-000000000003}',
+        'name': 'Finance Workstation Policy',
+        'status': 'enabled',
+        'when_created': '2020-02-01',
+        'when_changed': '2024-05-10',
+        'description': 'Finance security: restricted USB, encrypted temp files, approved apps only',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{D4E5F607-0000-0000-0000-000000000004}': {
+        'guid': '{D4E5F607-0000-0000-0000-000000000004}',
+        'name': 'HR Data Protection Policy',
+        'status': 'enabled',
+        'when_created': '2020-03-05',
+        'when_changed': '2023-12-01',
+        'description': 'HR data handling: DLP rules, screen timeout, restricted print-to-PDF',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{E5F60718-0000-0000-0000-000000000005}': {
+        'guid': '{E5F60718-0000-0000-0000-000000000005}',
+        'name': 'Software Deployment - Office Suite',
+        'status': 'enabled',
+        'when_created': '2021-06-01',
+        'when_changed': '2024-10-15',
+        'description': 'Microsoft 365 deployment and update channel policy for corporate users',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{F6071829-0000-0000-0000-000000000006}': {
+        'guid': '{F6071829-0000-0000-0000-000000000006}',
+        'name': 'Screensaver & Lock Policy',
+        'status': 'enabled',
+        'when_created': '2018-04-01',
+        'when_changed': '2023-01-15',
+        'description': 'Screen lock after 10 minutes, password-protected screensaver required',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{07182930-0000-0000-0000-000000000007}': {
+        'guid': '{07182930-0000-0000-0000-000000000007}',
+        'name': 'Service Account Restrictions',
+        'status': 'enabled',
+        'when_created': '2019-01-15',
+        'when_changed': '2024-02-20',
+        'description': 'No interactive logon, no RDP, minimal rights for service accounts',
+        'security_filters': ['Authenticated Users'],
+    },
+    '{1829304A-0000-0000-0000-000000000008}': {
+        'guid': '{1829304A-0000-0000-0000-000000000008}',
+        'name': 'Operations Security Baseline',
+        'status': 'enabled',
+        'when_created': '2022-01-10',
+        'when_changed': '2024-01-05',
+        'description': 'Warehouse/logistics workstation hardening — currently link-disabled',
+        'security_filters': ['Authenticated Users'],
+    },
+}
+
+# GPO links: ou_dn → list of link descriptors
+# order = processing order (lower = applied last / wins); enforced = can't be blocked
+_GPO_LINKS = {
+    'DC=acme,DC=local': [
+        {'guid': '{31B2F340-016D-11D2-945F-00C04FB984F9}', 'order': 1, 'enforced': True,  'link_enabled': True},
+        {'guid': '{A1B2C3D4-0000-0000-0000-000000000001}', 'order': 2, 'enforced': True,  'link_enabled': True},
+        {'guid': '{F6071829-0000-0000-0000-000000000006}', 'order': 3, 'enforced': False, 'link_enabled': True},
+    ],
+    'OU=Corporate,DC=acme,DC=local': [
+        {'guid': '{E5F60718-0000-0000-0000-000000000005}', 'order': 1, 'enforced': False, 'link_enabled': True},
+    ],
+    'OU=IT,DC=acme,DC=local': [
+        {'guid': '{B2C3D4E5-0000-0000-0000-000000000002}', 'order': 1, 'enforced': False, 'link_enabled': True},
+    ],
+    'OU=Finance,DC=acme,DC=local': [
+        {'guid': '{C3D4E5F6-0000-0000-0000-000000000003}', 'order': 1, 'enforced': False, 'link_enabled': True},
+        {'guid': '{E5F60718-0000-0000-0000-000000000005}', 'order': 2, 'enforced': False, 'link_enabled': True},
+    ],
+    'OU=HR,DC=acme,DC=local': [
+        {'guid': '{D4E5F607-0000-0000-0000-000000000004}', 'order': 1, 'enforced': False, 'link_enabled': True},
+        {'guid': '{E5F60718-0000-0000-0000-000000000005}', 'order': 2, 'enforced': False, 'link_enabled': True},
+    ],
+    'OU=Service_Accounts,DC=acme,DC=local': [
+        {'guid': '{07182930-0000-0000-0000-000000000007}', 'order': 1, 'enforced': False, 'link_enabled': True},
+    ],
+    'OU=Operations,DC=acme,DC=local': [
+        {'guid': '{1829304A-0000-0000-0000-000000000008}', 'order': 1, 'enforced': False, 'link_enabled': False},
+    ],
+}
+
+# OUs that block GPO inheritance from parent containers
+_BLOCKS_INHERITANCE = {'OU=Service_Accounts,DC=acme,DC=local'}
+
 
 # ─── Mock Client ──────────────────────────────────────────────────────────────
 
@@ -672,6 +800,102 @@ class MockADClient:
             'groups': groups,
             'group_count': len(groups),
             'when_created': u['when_created'],
+        }
+
+    def get_all_gpos(self):
+        """Return all GPOs with computed link counts."""
+        link_counts = {}
+        for links in _GPO_LINKS.values():
+            for link in links:
+                link_counts[link['guid']] = link_counts.get(link['guid'], 0) + 1
+        result = []
+        for g in _GPOS.values():
+            result.append({
+                'guid': g['guid'],
+                'name': g['name'],
+                'status': g['status'],
+                'when_created': g['when_created'],
+                'when_changed': g['when_changed'],
+                'description': g['description'],
+                'link_count': link_counts.get(g['guid'], 0),
+                'security_filters': g['security_filters'],
+            })
+        return sorted(result, key=lambda x: x['name'])
+
+    def get_gpo_details(self, guid):
+        """Return GPO details including all OU links."""
+        g = _GPOS.get(guid)
+        if not g:
+            return None
+        linked_ous = []
+        for ou_dn, links in _GPO_LINKS.items():
+            for link in links:
+                if link['guid'] == guid:
+                    ou_info = _OUS.get(ou_dn, {})
+                    linked_ous.append({
+                        'ou_dn': ou_dn,
+                        'ou_name': ou_info.get('name', ou_dn),
+                        'order': link['order'],
+                        'enforced': link['enforced'],
+                        'link_enabled': link['link_enabled'],
+                    })
+        linked_ous.sort(key=lambda x: x['ou_name'])
+        return {
+            'guid': g['guid'],
+            'name': g['name'],
+            'status': g['status'],
+            'when_created': g['when_created'],
+            'when_changed': g['when_changed'],
+            'description': g['description'],
+            'security_filters': g['security_filters'],
+            'linked_ous': linked_ous,
+        }
+
+    def get_ou_gpos(self, dn):
+        """Return GPOs applied to an OU: direct links + inherited from ancestors."""
+        blocks = dn in _BLOCKS_INHERITANCE
+
+        direct_links = []
+        for link in _GPO_LINKS.get(dn, []):
+            g = _GPOS.get(link['guid'], {})
+            direct_links.append({
+                'guid': link['guid'],
+                'name': g.get('name', link['guid']),
+                'order': link['order'],
+                'enforced': link['enforced'],
+                'link_enabled': link['link_enabled'],
+                'source': 'direct',
+            })
+
+        inherited_links = []
+        parent = _get_parent_dn(dn)
+        while parent:
+            for link in _GPO_LINKS.get(parent, []):
+                if not link['link_enabled']:
+                    parent = _get_parent_dn(parent)
+                    continue
+                # If this OU blocks inheritance, only enforced GPOs pass through
+                if blocks and not link['enforced']:
+                    continue
+                g = _GPOS.get(link['guid'], {})
+                parent_info = _OUS.get(parent, {})
+                inherited_links.append({
+                    'guid': link['guid'],
+                    'name': g.get('name', link['guid']),
+                    'order': link['order'],
+                    'enforced': link['enforced'],
+                    'link_enabled': link['link_enabled'],
+                    'source': 'inherited',
+                    'inherited_from': parent_info.get('name', parent),
+                    'inherited_from_dn': parent,
+                })
+            parent = _get_parent_dn(parent)
+
+        return {
+            'dn': dn,
+            'blocks_inheritance': blocks,
+            'direct': direct_links,
+            'inherited': inherited_links,
         }
 
     def _user_summary(self, u):

@@ -4,12 +4,13 @@ import TopologyMap from './components/TopologyMap'
 import DetailPanel from './components/DetailPanel'
 import AlertsPanel from './components/AlertsPanel'
 import NewTodayPanel from './components/NewTodayPanel'
+import GPOPanel from './components/GPOPanel'
 import { api } from './api/adApi'
 
 const AUTO_REFRESH_MS = 60 * 60 * 1000  // 1 hour
 
 export default function App() {
-  const [view, setView] = useState('topology')  // 'topology' | 'alerts' | 'new-today'
+  const [view, setView] = useState('topology')  // 'topology' | 'alerts' | 'new-today' | 'gpo'
   const [selectedNode, setSelectedNode] = useState(null)
   const [detailData, setDetailData] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -137,6 +138,7 @@ export default function App() {
             onUserSelect={(user) => { setView('topology'); loadDetail(user) }}
           />
         )}
+        {view === 'gpo' && <GPOPanel />}
       </main>
     </div>
   )

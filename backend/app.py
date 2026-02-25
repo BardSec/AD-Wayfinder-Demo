@@ -109,6 +109,42 @@ def new_today():
         return _err(str(e), 500)
 
 
+# ─── GPO endpoints (1-hour cache) ────────────────────────────────────────────
+
+@app.route('/api/gpos')
+def gpos():
+    try:
+        return jsonify(_cache.get_or_set('gpos', lambda: _get_client().get_all_gpos()))
+    except Exception as e:
+        return _err(str(e), 500)
+
+
+@app.route('/api/gpo')
+def gpo():
+    guid = request.args.get('guid', '').strip()
+    if not guid:
+        return _err('guid parameter is required')
+    try:
+        data = _cache.get_or_set(f'gpo:{guid}', lambda: _get_client().get_gpo_details(guid))
+        if data is None:
+            return _err('GPO not found', 404)
+        return jsonify(data)
+    except Exception as e:
+        return _err(str(e), 500)
+
+
+@app.route('/api/ou-gpos')
+def ou_gpos():
+    dn = request.args.get('dn', '').strip()
+    if not dn:
+        return _err('dn parameter is required')
+    try:
+        return jsonify(_cache.get_or_set(
+            f'ou_gpos:{dn}', lambda: _get_client().get_ou_gpos(dn)))
+    except Exception as e:
+        return _err(str(e), 500)
+
+
 # ─── Search (never cached — always live) ─────────────────────────────────────
 
 @app.route('/api/search')
