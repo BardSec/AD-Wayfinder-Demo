@@ -4,7 +4,7 @@ Used when USE_MOCK_DATA=false and a live DC is reachable.
 """
 import re
 from datetime import datetime, timedelta
-from ldap3 import Server, Connection, ALL, NTLM, SUBTREE, BASE, LEVEL
+from ldap3 import Server, Connection, ALL, SIMPLE, SUBTREE, BASE, LEVEL
 import config as cfg
 
 WINDOWS_EPOCH = datetime(1601, 1, 1)
@@ -83,7 +83,7 @@ def _get_connection():
         server,
         user=cfg.AD_USER,
         password=cfg.AD_PASSWORD,
-        authentication=NTLM,
+        authentication=SIMPLE,
         auto_bind=True,
     )
     if cfg.AD_USE_TLS and not cfg.AD_USE_SSL:
