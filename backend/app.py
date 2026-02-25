@@ -1,9 +1,11 @@
 """
 AD Wayfinder — Flask API
 """
+from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import config as cfg
+import cache as _cache
 
 app = Flask(__name__)
 CORS(app)
@@ -21,12 +23,12 @@ def _err(msg, status=400):
     return jsonify({'error': msg}), status
 
 
-# ─── Routes ───────────────────────────────────────────────────────────────────
+# ─── Core tree / detail endpoints (1-hour cache) ──────────────────────────────
 
 @app.route('/api/tree')
 def tree():
     try:
-        return jsonify(_get_client().get_tree())
+        return jsonify(_cache.get_or_set('tree', lambda: _get_client().get_tree()))
     except Exception as e:
         return _err(str(e), 500)
 
@@ -37,7 +39,7 @@ def ou():
     if not dn:
         return _err('dn parameter is required')
     try:
-        data = _get_client().get_ou_contents(dn)
+        data = _cache.get_or_set(f'ou:{dn}', lambda: _get_client().get_ou_contents(dn))
         if data is None:
             return _err('OU not found', 404)
         return jsonify(data)
@@ -51,7 +53,7 @@ def group():
     if not dn:
         return _err('dn parameter is required')
     try:
-        data = _get_client().get_group_details(dn)
+        data = _cache.get_or_set(f'group:{dn}', lambda: _get_client().get_group_details(dn))
         if data is None:
             return _err('Group not found', 404)
         return jsonify(data)
@@ -65,7 +67,7 @@ def user():
     if not dn:
         return _err('dn parameter is required')
     try:
-        data = _get_client().get_user_details(dn)
+        data = _cache.get_or_set(f'user:{dn}', lambda: _get_client().get_user_details(dn))
         if data is None:
             return _err('User not found', 404)
         return jsonify(data)
@@ -76,10 +78,38 @@ def user():
 @app.route('/api/alerts')
 def alerts():
     try:
-        return jsonify(_get_client().get_alerts())
+        return jsonify(_cache.get_or_set('alerts', lambda: _get_client().get_alerts()))
     except Exception as e:
         return _err(str(e), 500)
 
+
+@app.route('/api/stats')
+def stats():
+    try:
+        return jsonify(_cache.get_or_set('stats', lambda: _get_client().get_stats()))
+    except Exception as e:
+        return _err(str(e), 500)
+
+
+# ─── New-today onboarding endpoint (15-min cache) ────────────────────────────
+
+@app.route('/api/new-today')
+def new_today():
+    """
+    Return all user accounts whose whenCreated falls within the current
+    calendar day.  Shorter TTL (15 min) so new hires appear promptly.
+    """
+    try:
+        return jsonify(_cache.get_or_set(
+            'new_today',
+            lambda: _get_client().get_new_today(),
+            ttl=900,
+        ))
+    except Exception as e:
+        return _err(str(e), 500)
+
+
+# ─── Search (never cached — always live) ─────────────────────────────────────
 
 @app.route('/api/search')
 def search():
@@ -92,17 +122,34 @@ def search():
         return _err(str(e), 500)
 
 
-@app.route('/api/stats')
-def stats():
-    try:
-        return jsonify(_get_client().get_stats())
-    except Exception as e:
-        return _err(str(e), 500)
+# ─── Cache management ─────────────────────────────────────────────────────────
 
+@app.route('/api/last-updated')
+def last_updated():
+    """Return ISO timestamp of the most recent cache population."""
+    ts = _cache.last_updated()
+    return jsonify({
+        'timestamp': ts,
+        'iso': datetime.fromtimestamp(ts).isoformat() if ts else None,
+    })
+
+
+@app.route('/api/refresh', methods=['POST'])
+def refresh():
+    """Invalidate all cached entries — next request re-queries AD."""
+    _cache.invalidate_all()
+    return jsonify({'status': 'ok', 'message': 'Cache cleared'})
+
+
+# ─── Health ───────────────────────────────────────────────────────────────────
 
 @app.route('/api/health')
 def health():
-    return jsonify({'status': 'ok', 'mock_mode': cfg.USE_MOCK_DATA})
+    return jsonify({
+        'status': 'ok',
+        'mock_mode': cfg.USE_MOCK_DATA,
+        'stale_threshold_days': cfg.STALE_ACCOUNT_DAYS,
+    })
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────

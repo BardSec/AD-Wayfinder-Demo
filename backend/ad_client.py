@@ -265,6 +265,45 @@ class ADClient:
             'stale_threshold_days': cfg.STALE_ACCOUNT_DAYS,
         }
 
+    def get_new_today(self):
+        """Return users whose whenCreated falls within today (UTC)."""
+        today_str = datetime.utcnow().strftime('%Y%m%d')
+        ldap_today = f'{today_str}000000.0Z'
+        self._conn.search(
+            self._base,
+            f'(&(objectClass=user)(objectCategory=person)(whenCreated>={ldap_today}))',
+            search_scope=SUBTREE,
+            attributes=['sAMAccountName', 'displayName', 'mail', 'telephoneNumber',
+                        'department', 'title', 'distinguishedName', 'userAccountControl',
+                        'whenCreated', 'memberOf', 'lastLogonTimestamp'],
+        )
+        results = []
+        for e in self._conn.entries:
+            dn = str(e.distinguishedName)
+            parent_dn = dn.split(',', 1)[1] if ',' in dn else dn
+            enabled = _is_enabled(e.userAccountControl)
+            last = _filetime_to_dt(e.lastLogonTimestamp)
+            groups = [str(g) for g in (e.memberOf or [])]
+            results.append({
+                'dn': dn,
+                'name': self._str(e.displayName) or self._str(e.sAMAccountName),
+                'sam': self._str(e.sAMAccountName),
+                'type': 'user',
+                'email': self._str(e.mail),
+                'phone': self._str(e.telephoneNumber),
+                'title': self._str(e.title),
+                'department': self._str(e.department),
+                'ou_name': parent_dn,
+                'ou_dn': parent_dn,
+                'enabled': enabled,
+                'has_logged_in': last is not None,
+                'has_email': bool(self._str(e.mail)),
+                'groups': groups,
+                'group_count': len(groups),
+                'when_created': self._str(e.whenCreated),
+            })
+        return sorted(results, key=lambda x: x.get('when_created', ''), reverse=True)
+
     # ── Private helpers ───────────────────────────────────────────────────────
 
     def _domain_info(self):

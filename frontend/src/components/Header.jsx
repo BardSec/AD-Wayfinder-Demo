@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, AlertTriangle, Network, X, User, Users, Folder } from 'lucide-react'
+import { Search, AlertTriangle, Network, X, User, Users, Folder,
+         RefreshCw, UserPlus, Clock } from 'lucide-react'
 
 const TYPE_ICON = {
   user: <User size={14} className="text-slate-500" />,
@@ -7,13 +8,30 @@ const TYPE_ICON = {
   ou: <Folder size={14} className="text-amber-600" />,
 }
 
+function timeAgo(date) {
+  if (!date) return ''
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ago`
+}
+
 export default function Header({
-  view, onViewChange, alertCount,
+  view, onViewChange, alertCount, newTodayCount,
   onSearch, searchResults, onSearchSelect, onSearchClear,
+  lastUpdated, isRefreshing, onRefresh,
 }) {
   const [query, setQuery] = useState('')
+  const [tick, setTick] = useState(0)   // bumped every minute to refresh "X ago"
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
+
+  // Tick every minute so the "last updated" label stays current
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleChange = (e) => {
     const val = e.target.value
@@ -29,7 +47,6 @@ export default function Header({
     inputRef.current?.focus()
   }
 
-  // Close dropdown on Escape
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') clear() }
     window.addEventListener('keydown', handler)
@@ -37,7 +54,7 @@ export default function Header({
   }, [])
 
   return (
-    <header className="bg-slate-900 text-white px-4 py-0 flex items-center gap-4 shadow-lg z-20 flex-shrink-0" style={{ height: 56 }}>
+    <header className="bg-slate-900 text-white px-4 py-0 flex items-center gap-3 shadow-lg z-20 flex-shrink-0" style={{ height: 56 }}>
       {/* Brand */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <Network size={22} className="text-indigo-400" />
@@ -45,7 +62,7 @@ export default function Header({
       </div>
 
       {/* Nav tabs */}
-      <nav className="flex items-center gap-1 ml-2">
+      <nav className="flex items-center gap-1 ml-1">
         <TabBtn active={view === 'topology'} onClick={() => onViewChange('topology')}>
           Topology
         </TabBtn>
@@ -57,10 +74,19 @@ export default function Header({
             </span>
           )}
         </TabBtn>
+        <TabBtn active={view === 'new-today'} onClick={() => onViewChange('new-today')}>
+          <UserPlus size={13} className="mr-0.5" />
+          New Today
+          {newTodayCount > 0 && (
+            <span className="ml-1.5 bg-emerald-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+              {newTodayCount}
+            </span>
+          )}
+        </TabBtn>
       </nav>
 
       {/* Search */}
-      <div className="relative flex-1 max-w-md ml-auto">
+      <div className="relative flex-1 max-w-sm ml-auto">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         <input
           ref={inputRef}
@@ -76,7 +102,7 @@ export default function Header({
           </button>
         )}
 
-        {/* Dropdown */}
+        {/* Search dropdown */}
         {searchResults !== null && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden">
             {searchResults.length === 0 ? (
@@ -113,16 +139,27 @@ export default function Header({
         )}
       </div>
 
-      {/* Alert badge shortcut */}
-      {alertCount > 0 && (
+      {/* Last-updated indicator + refresh button */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="flex items-center gap-1 text-xs text-slate-400">
+          <Clock size={11} />
+          {isRefreshing ? (
+            <span className="text-indigo-300">Refreshing…</span>
+          ) : (
+            <span title={lastUpdated?.toLocaleString()}>
+              {timeAgo(lastUpdated)}
+            </span>
+          )}
+        </span>
         <button
-          onClick={() => onViewChange('alerts')}
-          className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          title="Refresh data from AD"
+          className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 disabled:opacity-40 transition-colors"
         >
-          <AlertTriangle size={13} />
-          {alertCount} alert{alertCount !== 1 ? 's' : ''}
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
         </button>
-      )}
+      </div>
     </header>
   )
 }

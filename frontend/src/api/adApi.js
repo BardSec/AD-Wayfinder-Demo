@@ -17,4 +17,8 @@ export const api = {
   getAlerts: () => _get('/alerts'),
   getStats: () => _get('/stats'),
   search: (q) => _get(`/search?q=${encodeURIComponent(q)}`),
+  getNewToday: () => _get('/new-today'),
+  getLastUpdated: () => _get('/last-updated'),
+  triggerRefresh: () =>
+    fetch(`${BASE}/refresh`, { method: 'POST' }).then((r) => r.json()),
 }

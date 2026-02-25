@@ -32,6 +32,11 @@ def _is_enabled(uac):
     return not (int(uac) & 0x0002)
 
 
+def _today():
+    """Return today's ISO date string (YYYY-MM-DD)."""
+    return datetime.now().date().isoformat()
+
+
 # ─── Sample Data ─────────────────────────────────────────────────────────────
 
 _OUS = {
@@ -308,6 +313,41 @@ _USERS_RAW = [
          when_created='2017-03-15',
          logon_count=2341, bad_pwd_count=0,
          member_of=[]),
+
+    # ── New hires (created today — for onboarding panel demo) ─────────────────
+    dict(dn='CN=Tom Bradley,OU=Systems_Administration,OU=IT,DC=acme,DC=local',
+         sam='tom.bradley', display_name='Tom Bradley',
+         first_name='Tom', last_name='Bradley',
+         email='tom.bradley@acme.local', phone='+1 555-0211',
+         department='IT', title='Junior Systems Administrator',
+         company='Acme Corporation', uac=512,
+         last_logon=None,             # new hire — never logged in
+         when_created=_today(),
+         logon_count=0, bad_pwd_count=0,
+         member_of=[]),               # no groups yet
+
+    dict(dn='CN=Sophie Chen,OU=Finance,DC=acme,DC=local',
+         sam='sophie.chen', display_name='Sophie Chen',
+         first_name='Sophie', last_name='Chen',
+         email='sophie.chen@acme.local', phone='+1 555-0311',
+         department='Finance', title='Financial Analyst',
+         company='Acme Corporation', uac=512,
+         last_logon=None,             # new hire — never logged in
+         when_created=_today(),
+         logon_count=0, bad_pwd_count=0,
+         member_of=['CN=GG_Finance_All,OU=Finance,DC=acme,DC=local']),
+
+    dict(dn='CN=Marcus Lee,OU=Logistics,OU=Operations,DC=acme,DC=local',
+         sam='marcus.lee', display_name='Marcus Lee',
+         first_name='Marcus', last_name='Lee',
+         email=None,                  # email not yet provisioned
+         phone='+1 555-0511',
+         department='Operations', title='Logistics Coordinator',
+         company='Acme Corporation', uac=512,
+         last_logon=None,             # new hire — never logged in
+         when_created=_today(),
+         logon_count=0, bad_pwd_count=0,
+         member_of=[]),               # no groups yet
 ]
 
 # Index by DN for fast lookup
@@ -595,7 +635,44 @@ class MockADClient:
             'stale_threshold_days': cfg.STALE_ACCOUNT_DAYS,
         }
 
+    def get_new_today(self):
+        """Return users created today with onboarding status fields."""
+        today = _today()
+        results = []
+        for u in _USERS.values():
+            wc = u.get('when_created', '')
+            if isinstance(wc, str) and wc.startswith(today):
+                results.append(self._user_onboarding_summary(u))
+        return sorted(results, key=lambda x: x['when_created'], reverse=True)
+
     # ── Internal helpers ──────────────────────────────────────────────────────
+
+    def _user_onboarding_summary(self, u):
+        enabled = _is_enabled(u['uac'])
+        parent_dn = _get_parent_dn(u['dn'])
+        ou_name = _OUS.get(parent_dn, {}).get('name', parent_dn or '')
+        groups = [
+            {'dn': g_dn, 'name': _GROUPS.get(g_dn, {}).get('name', g_dn)}
+            for g_dn in u.get('member_of', [])
+        ]
+        return {
+            'dn': u['dn'],
+            'name': u['display_name'],
+            'sam': u['sam'],
+            'type': 'user',
+            'email': u['email'],
+            'phone': u['phone'],
+            'title': u['title'],
+            'department': u['department'],
+            'ou_name': ou_name,
+            'ou_dn': parent_dn,
+            'enabled': enabled,
+            'has_logged_in': u['last_logon'] is not None,
+            'has_email': bool(u.get('email')),
+            'groups': groups,
+            'group_count': len(groups),
+            'when_created': u['when_created'],
+        }
 
     def _user_summary(self, u):
         enabled = _is_enabled(u['uac'])
