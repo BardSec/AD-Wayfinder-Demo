@@ -1,6 +1,7 @@
 # Environment / secrets
 .env
 backend/.env
+secrets/*.txt
 
 # Python
 __pycache__/
