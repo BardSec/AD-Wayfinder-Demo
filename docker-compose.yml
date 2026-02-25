@@ -7,16 +7,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
+    env_file:
+      - ./backend/.env
     environment:
-      - USE_MOCK_DATA=${USE_MOCK_DATA:-true}
-      - AD_HOST=${AD_HOST:-localhost}
-      - AD_PORT=${AD_PORT:-389}
-      - AD_USER=${AD_USER:-}
       - AD_PASSWORD_FILE=/run/secrets/ad_password
-      - AD_BASE_DN=${AD_BASE_DN:-DC=acme,DC=local}
-      - AD_USE_SSL=${AD_USE_SSL:-false}
-      - AD_USE_TLS=${AD_USE_TLS:-false}
-      - STALE_ACCOUNT_DAYS=${STALE_ACCOUNT_DAYS:-180}
     secrets:
       - ad_password
     restart: unless-stopped
