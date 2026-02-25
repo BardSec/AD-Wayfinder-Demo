@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - USE_MOCK_DATA=${USE_MOCK_DATA:-true}
+      - AD_HOST=${AD_HOST:-localhost}
+      - AD_PORT=${AD_PORT:-389}
+      - AD_USER=${AD_USER:-}
+      - AD_PASSWORD=${AD_PASSWORD:-}
+      - AD_BASE_DN=${AD_BASE_DN:-DC=acme,DC=local}
+      - AD_USE_SSL=${AD_USE_SSL:-false}
+      - AD_USE_TLS=${AD_USE_TLS:-false}
+      - STALE_ACCOUNT_DAYS=${STALE_ACCOUNT_DAYS:-180}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
