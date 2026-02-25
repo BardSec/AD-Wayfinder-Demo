@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Search, AlertTriangle, Network, X, User, Users, Folder,
-         RefreshCw, UserPlus, Clock, ShieldCheck } from 'lucide-react'
+         RefreshCw, UserPlus, Clock, ShieldCheck, LogOut } from 'lucide-react'
 
 const TYPE_ICON = {
   user: <User size={14} className="text-slate-500" />,
@@ -20,7 +20,7 @@ function timeAgo(date) {
 export default function Header({
   view, onViewChange, alertCount, newTodayCount,
   onSearch, searchResults, onSearchSelect, onSearchClear,
-  lastUpdated, isRefreshing, onRefresh,
+  lastUpdated, isRefreshing, onRefresh, user,
 }) {
   const [query, setQuery] = useState('')
   const [tick, setTick] = useState(0)   // bumped every minute to refresh "X ago"
@@ -164,6 +164,23 @@ export default function Header({
           <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
         </button>
       </div>
+
+      {/* Signed-in user + logout */}
+      {user && (
+        <div className="flex items-center gap-2 flex-shrink-0 border-l border-slate-700 pl-3">
+          <div className="flex items-center gap-1.5 text-xs text-slate-300">
+            <User size={13} className="text-slate-400" />
+            <span className="max-w-[140px] truncate" title={user.email}>{user.name || user.email}</span>
+          </div>
+          <a
+            href="/auth/logout"
+            title="Sign out"
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+          >
+            <LogOut size={14} />
+          </a>
+        </div>
+      )}
     </header>
   )
 }

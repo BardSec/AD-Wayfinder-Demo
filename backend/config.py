@@ -25,3 +25,13 @@ AD_USE_TLS = os.getenv('AD_USE_TLS', 'false').lower() == 'true'
 USE_MOCK_DATA = os.getenv('USE_MOCK_DATA', 'true').lower() == 'true'
 FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
 STALE_ACCOUNT_DAYS = int(os.getenv('STALE_ACCOUNT_DAYS', 180))
+
+# ─── Microsoft Entra ID (Azure AD) authentication ────────────────────────────
+AUTH_ENABLED = os.getenv('AUTH_ENABLED', 'false').lower() == 'true'
+AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID', '')
+AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID', '')
+AZURE_CLIENT_SECRET = _read_secret('AZURE_CLIENT_SECRET_FILE', 'AZURE_CLIENT_SECRET')
+AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', 'http://localhost:5000/auth/callback')
+AZURE_POST_LOGOUT_URI = os.getenv('AZURE_POST_LOGOUT_URI', 'http://localhost:3000')
+ALLOWED_GROUP_ID = os.getenv('ALLOWED_GROUP_ID', '')
+FLASK_SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev-insecure-change-me')
