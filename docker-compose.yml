@@ -7,12 +7,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
-    env_file:
-      - ./backend/.env
     environment:
-      - AD_PASSWORD_FILE=/run/secrets/ad_password
-    secrets:
-      - ad_password
+      - USE_MOCK_DATA=true
+      - AUTH_ENABLED=false
     restart: unless-stopped
 
   frontend:
@@ -24,7 +21,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-secrets:
-  ad_password:
-    file: ./secrets/ad_password.txt

@@ -2,10 +2,6 @@ const BASE = '/api'
 
 async function _get(path) {
   const res = await fetch(`${BASE}${path}`)
-  if (res.status === 401) {
-    window.location.href = '/auth/login'
-    return
-  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `HTTP ${res.status}`)
